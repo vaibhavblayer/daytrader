@@ -58,3 +58,5 @@ Thumbs.db
 *.db
 *.sqlite
 credentials.toml
+*.kiro/
+.kiro/

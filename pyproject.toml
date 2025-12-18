@@ -1,0 +1,38 @@
+[project]
+name = "daytrader"
+version = "0.1.0"
+description = "AI-powered CLI for Indian stock market day trading"
+authors = [
+    {name = "vaibhavblayer", email = "vaibhavblayer@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "openai-agents>=0.0.1",
+    "smartapi-python>=1.4.0",
+    "pandas>=2.0.0",
+    "pandas-ta>=0.3.14b",
+    "tavily-python>=0.3.0",
+    "toml>=0.10.2",
+    "pydantic>=2.0.0",
+    "pyotp>=2.9.0",
+]
+
+[project.scripts]
+daytrader = "daytrader.cli.main:cli"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+hypothesis = "^6.100.0"
+pytest-mock = "^3.12.0"

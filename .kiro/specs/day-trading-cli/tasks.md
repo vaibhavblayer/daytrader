@@ -1,0 +1,288 @@
+# Implementation Plan
+
+- [-] 1. Project Setup and Configuration
+  - [-] 1.1 Initialize project structure with Poetry
+    - Create `pyproject.toml` with dependencies: click, rich, openai-agents, smartapi-python, pandas, pandas-ta, tavily-python, toml, pydantic
+    - Create directory structure: daytrader/{cli,agents,brokers,db,indicators,models,prompts,tools}
+    - _Requirements: 1.1_
+  - [ ] 1.2 Implement configuration module
+    - Create `config.py` with Config dataclass and load/save functions
+    - Support TOML format at `~/.config/daytrader/config.toml`
+    - Create template config on first run
+    - _Requirements: 1.1, 1.2, 1.4_
+  - [ ] 1.3 Write property test for config round-trip
+    - **Property 1: Configuration Loading Consistency**
+    - **Validates: Requirements 1.1**
+  - [ ] 1.4 Write property test for missing config key detection
+    - **Property 2: Missing Config Key Detection**
+    - **Validates: Requirements 1.3**
+
+- [x] 2. Database Layer
+  - [x] 2.1 Define data models
+    - Create models: Candle, Order, OrderResult, Position, Trade, Alert, JournalEntry
+    - Use Pydantic for validation
+    - _Requirements: 15.3_
+  - [x] 2.2 Implement SQLite store
+    - Create `db/store.py` with DataStore class
+    - Implement schema creation on first run
+    - Implement CRUD operations for all tables
+    - _Requirements: 15.1, 15.2, 15.3_
+  - [x] 2.3 Write property test for database schema completeness
+    - **Property 36: Database Schema Completeness**
+    - **Validates: Requirements 15.3**
+  - [x] 2.4 Write property test for watchlist operations
+    - **Property 31: Watchlist Add/Remove Consistency**
+    - **Validates: Requirements 13.1, 13.2, 13.3**
+  - [x] 2.5 Write property test for alert storage
+    - **Property 33: Alert Storage and Retrieval**
+    - **Validates: Requirements 14.1, 14.2**
+
+- [x] 3. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 4. Broker Abstraction Layer
+  - [x] 4.1 Implement base broker interface
+    - Create `brokers/base.py` with BaseBroker abstract class
+    - Define abstract methods: login, get_quote, get_historical, place_order, get_positions, get_balance
+    - _Requirements: 2.1, 3.1, 6.1_
+  - [x] 4.2 Implement Angel One broker
+    - Create `brokers/angelone.py` with AngelOneBroker class
+    - Implement authentication with TOTP
+    - Implement all broker methods using SmartAPI
+    - Handle session token storage and refresh
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+  - [x] 4.3 Write property test for session token persistence
+    - **Property 4: Session Token Persistence**
+    - **Validates: Requirements 2.2**
+  - [x] 4.4 Implement paper trading broker
+    - Create `brokers/paper.py` with PaperBroker class
+    - Simulate order execution with virtual balance
+    - Track positions in SQLite
+    - Implement slippage simulation
+    - _Requirements: 1.5, 6.6, 18.1, 18.2, 18.3_
+  - [x] 4.5 Write property test for paper mode isolation
+    - **Property 3: Paper Mode Isolation**
+    - **Validates: Requirements 1.5**
+  - [x] 4.6 Write property test for paper trading balance
+    - **Property 42: Paper Trading Balance Tracking**
+    - **Validates: Requirements 18.2**
+
+- [x] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 6. Technical Indicators
+  - [x] 6.1 Implement indicator calculations
+    - Create `indicators/technical.py`
+    - Implement: RSI, MACD, EMA, SMA, Bollinger Bands, ATR, VWAP
+    - Use pandas-ta as reference for validation
+    - _Requirements: 4.1, 4.2_
+  - [x] 6.2 Write property test for RSI accuracy
+    - **Property 9: RSI Calculation Accuracy**
+    - **Validates: Requirements 4.1, 4.2**
+  - [x] 6.3 Write property test for MACD accuracy
+    - **Property 10: MACD Calculation Accuracy**
+    - **Validates: Requirements 4.1, 4.2**
+
+- [x] 7. Agent Tools
+  - [x] 7.1 Implement database query tools
+    - Create `tools/database.py` with query_candles, get_watchlist, get_positions tools
+    - Tools should query SQLite and return formatted results
+    - _Requirements: 4.3, 10.1_
+  - [x] 7.2 Implement indicator tools
+    - Create `tools/indicators.py` with calculate_indicators, find_support_resistance tools
+    - _Requirements: 4.2, 10.2_
+  - [x] 7.3 Implement web search tools
+    - Create `tools/web.py` with web_search tool using Tavily API
+    - _Requirements: 9.2_
+  - [x] 7.4 Implement broker tools
+    - Create `tools/broker.py` with place_order, get_positions, get_balance tools
+    - _Requirements: 6.1, 7.1, 8.3_
+
+- [x] 8. AI Agents
+  - [x] 8.1 Implement agent base utilities
+    - Create `agents/base.py` with create_agent, run_agent_sync functions
+    - Configure OpenAI Agents SDK with model from config
+    - _Requirements: 9.1, 10.1, 11.1, 12.1_
+  - [x] 8.2 Implement Research Agent
+    - Create `agents/research.py` with ResearchAgent class
+    - Add web_search, get_company_info tools
+    - Implement research caching
+    - _Requirements: 9.1, 9.3, 9.4, 9.5_
+  - [x] 8.3 Write property test for research cache
+    - **Property 24: Research Cache Persistence**
+    - **Validates: Requirements 9.3**
+  - [x] 8.4 Implement Data Analyst Agent
+    - Create `agents/analyst.py` with DataAnalystAgent class
+    - Add query_candles, calculate_indicators, find_patterns tools
+    - _Requirements: 10.1, 10.2, 10.4_
+  - [x] 8.5 Write property test for indicator data source
+    - **Property 11: Indicator Data Source**
+    - **Validates: Requirements 4.3**
+  - [x] 8.6 Implement News Agent
+    - Create `agents/news.py` with NewsAgent class
+    - Add search_news, analyze_sentiment tools
+    - Implement news caching
+    - _Requirements: 11.1, 11.2, 11.4_
+  - [x] 8.7 Write property test for sentiment classification
+    - **Property 25: News Sentiment Classification**
+    - **Validates: Requirements 11.2**
+  - [x] 8.8 Implement Trading Agent
+    - Create `agents/trader.py` with TradingAgent class
+    - Add place_order, get_positions, cancel_order tools
+    - Implement confirmation requirement
+    - _Requirements: 6.1, 6.4, 7.1, 12.5_
+  - [x] 8.9 Implement Orchestrator Agent
+    - Create `agents/orchestrator.py` with OrchestratorAgent class
+    - Implement query routing logic
+    - Support multi-agent coordination
+    - Maintain conversation context
+    - _Requirements: 12.1, 12.2, 12.3, 12.4_
+  - [x] 8.10 Write property test for orchestrator routing
+    - **Property 27: Orchestrator Routing Consistency**
+    - **Validates: Requirements 12.2**
+  - [x] 8.11 Write property test for trade confirmation
+    - **Property 30: Trade Confirmation Requirement**
+    - **Validates: Requirements 12.5**
+
+- [x] 9. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 10. CLI Commands - Authentication
+  - [x] 10.1 Implement CLI entry point
+    - Create `cli/main.py` with click group
+    - Set up lazy loading for heavy imports
+    - _Requirements: 1.1_
+  - [x] 10.2 Implement login/logout commands
+    - Create `cli/auth.py` with login, logout commands
+    - Handle TOTP generation
+    - Store/clear session tokens
+    - _Requirements: 2.1, 2.5_
+
+- [x] 11. CLI Commands - Data and Analysis
+  - [x] 11.1 Implement data command
+    - Create `cli/data.py` with data, quote commands
+    - Fetch and cache historical data
+    - Display current quotes
+    - _Requirements: 3.1, 3.2, 3.4, 3.5_
+  - [x] 11.2 Write property test for cache persistence
+    - **Property 7: Cache Persistence**
+    - **Validates: Requirements 3.2, 3.3**
+  - [x] 11.3 Implement analyze command
+    - Create `cli/analyze.py` with analyze command
+    - Calculate and display indicators
+    - Support indicator filtering
+    - _Requirements: 4.1, 4.4, 4.5_
+  - [x] 11.4 Write property test for selective indicators
+    - **Property 12: Selective Indicator Calculation**
+    - **Validates: Requirements 4.4**
+  - [x] 11.5 Implement scan command
+    - Create `cli/scan.py` with scan command
+    - Support RSI, gap, volume filters
+    - Scan watchlist stocks
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [x] 11.6 Write property test for RSI filter
+    - **Property 13: RSI Filter Accuracy**
+    - **Validates: Requirements 5.1**
+  - [x] 11.7 Write property test for watchlist scan scope
+    - **Property 16: Watchlist Scan Scope**
+    - **Validates: Requirements 5.4**
+
+- [x] 12. CLI Commands - Trading
+  - [x] 12.1 Implement buy/sell commands
+    - Create `cli/trade.py` with buy, sell commands
+    - Support market, limit, and SL orders
+    - Default to MIS product type
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.7_
+  - [x] 12.2 Write property test for default product type
+    - **Property 18: Default Product Type**
+    - **Validates: Requirements 6.7**
+  - [x] 12.3 Implement positions command
+    - Add positions command to display open positions
+    - Calculate and display P&L
+    - _Requirements: 7.1, 7.4_
+  - [x] 12.4 Implement exit command
+    - Add exit command for single symbol and --all flag
+    - _Requirements: 7.2, 7.3_
+  - [x] 12.5 Write property test for exit completeness
+    - **Property 20: Position Exit Completeness**
+    - **Validates: Requirements 7.2**
+
+- [x] 13. CLI Commands - Portfolio
+  - [x] 13.1 Implement pnl command
+    - Create `cli/portfolio.py` with pnl command
+    - Calculate today's P&L and history
+    - _Requirements: 8.1, 8.2_
+  - [x] 13.2 Write property test for P&L calculation
+    - **Property 23: P&L Calculation Accuracy**
+    - **Validates: Requirements 8.1**
+  - [x] 13.3 Implement balance command
+    - Add balance command to display available funds
+    - _Requirements: 8.3_
+  - [x] 13.4 Implement journal command
+    - Add journal command to display trade history
+    - _Requirements: 8.5_
+  - [x] 13.5 Write property test for trade logging
+    - **Property 22: Trade Logging Completeness**
+    - **Validates: Requirements 8.4**
+
+- [x] 14. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 15. CLI Commands - AI Features
+  - [x] 15.1 Implement ask command
+    - Create `cli/ask.py` with ask command
+    - Route to Orchestrator Agent
+    - _Requirements: 12.1_
+  - [x] 15.2 Implement research command
+    - Add research command with --deep flag
+    - _Requirements: 9.1, 9.5_
+  - [x] 15.3 Implement news command
+    - Add news command for symbol
+    - Add events command for market events
+    - _Requirements: 11.1, 11.5_
+
+- [x] 16. CLI Commands - Watchlist and Alerts
+  - [x] 16.1 Implement watchlist commands
+    - Create `cli/watchlist.py` with watch group
+    - Add add, remove, list, import commands
+    - Support multiple named watchlists
+    - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
+  - [x] 16.2 Write property test for multiple watchlists
+    - **Property 32: Multiple Watchlist Support**
+    - **Validates: Requirements 13.4**
+  - [x] 16.3 Implement alert commands
+    - Create `cli/alerts.py` with alert, alerts commands
+    - Support price and indicator conditions
+    - _Requirements: 14.1, 14.2, 14.4, 14.5_
+  - [x] 16.4 Write property test for alert conditions
+    - **Property 34: Alert Condition Evaluation**
+    - **Validates: Requirements 14.3**
+
+- [x] 17. CLI Commands - Workflows
+  - [x] 17.1 Implement prep command
+    - Create `cli/workflow.py` with prep command
+    - Invoke Research and Data Analyst agents
+    - Check market status
+    - _Requirements: 16.1, 16.2, 16.4, 16.5_
+  - [x] 17.2 Write property test for prep agent invocation
+    - **Property 38: Prep Agent Invocation**
+    - **Validates: Requirements 16.4**
+  - [x] 17.3 Implement review command
+    - Add review command with --add-notes flag
+    - Calculate metrics and save to journal
+    - _Requirements: 17.1, 17.2, 17.4, 17.5_
+  - [x] 17.4 Write property test for review metrics
+    - **Property 40: Review Metrics Calculation**
+    - **Validates: Requirements 17.1, 17.2**
+
+- [x] 18. CLI Commands - Paper Trading
+  - [x] 18.1 Implement paper trading commands
+    - Create `cli/paper.py` with paper group
+    - Add reset, status commands
+    - _Requirements: 18.4, 18.5_
+  - [x] 18.2 Write property test for paper reset
+    - **Property 45: Paper Trading Reset**
+    - **Validates: Requirements 18.5**
+
+- [x] 19. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

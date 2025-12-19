@@ -513,6 +513,14 @@ def positions() -> None:
         total_sign = "+" if total_pnl >= 0 else ""
         console.print(f"\n[bold]Total P&L:[/bold] [{total_color}]{total_sign}₹{total_pnl:.2f}[/{total_color}]")
         
+        # Show quick sell commands
+        console.print("\n[dim]Quick sell:[/dim]")
+        for pos in pos_list:
+            # Extract base symbol (remove -EQ suffix if present)
+            symbol = pos.symbol.replace("-EQ", "")
+            product_flag = "--delivery" if pos.product in ("DELIVERY", "CNC") else ""
+            console.print(f"  [cyan]daytrader sell {symbol} {pos.quantity} {product_flag}[/cyan]".strip())
+        
     except Exception as e:
         console.print(Panel(
             f"[red]Failed to get positions:[/red]\n\n{str(e)}",

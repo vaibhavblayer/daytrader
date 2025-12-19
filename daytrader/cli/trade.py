@@ -174,16 +174,17 @@ def buy(
         broker = _get_broker(config)
         result = broker.place_order(order)
         
-        if result.status == "COMPLETE" or result.status == "OPEN":
+        if result.status in ("COMPLETE", "OPEN", "PLACED"):
             # Success
             result_text = (
                 f"[bold green]Order Executed Successfully[/bold green]\n\n"
                 f"Order ID:     {result.order_id}\n"
-                f"Status:       {result.status}\n"
-                f"Filled Qty:   {result.filled_qty}\n"
-                f"Filled Price: ₹{result.filled_price:.2f}\n"
-                f"Value:        ₹{result.filled_price * result.filled_qty:,.2f}"
+                f"Status:       {result.status}"
             )
+            if result.filled_qty > 0:
+                result_text += f"\nFilled Qty:   {result.filled_qty}"
+                result_text += f"\nFilled Price: ₹{result.filled_price:.2f}"
+                result_text += f"\nValue:        ₹{result.filled_price * result.filled_qty:,.2f}"
             if result.message:
                 result_text += f"\n\n[dim]{result.message}[/dim]"
             
@@ -342,16 +343,17 @@ def sell(
         broker = _get_broker(config)
         result = broker.place_order(order)
         
-        if result.status == "COMPLETE" or result.status == "OPEN":
+        if result.status in ("COMPLETE", "OPEN", "PLACED"):
             # Success
             result_text = (
                 f"[bold green]Order Executed Successfully[/bold green]\n\n"
                 f"Order ID:     {result.order_id}\n"
-                f"Status:       {result.status}\n"
-                f"Filled Qty:   {result.filled_qty}\n"
-                f"Filled Price: ₹{result.filled_price:.2f}\n"
-                f"Value:        ₹{result.filled_price * result.filled_qty:,.2f}"
+                f"Status:       {result.status}"
             )
+            if result.filled_qty > 0:
+                result_text += f"\nFilled Qty:   {result.filled_qty}"
+                result_text += f"\nFilled Price: ₹{result.filled_price:.2f}"
+                result_text += f"\nValue:        ₹{result.filled_price * result.filled_qty:,.2f}"
             if result.message:
                 result_text += f"\n\n[dim]{result.message}[/dim]"
             

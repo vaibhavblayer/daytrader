@@ -245,6 +245,113 @@ def data(symbol: str, days: int, timeframe: str) -> None:
 
 
 @click.command()
+@click.argument("symbols", nargs=-1, required=True)
+@click.option(
+    "-r", "--refresh",
+    default=1,
+    type=int,
+    help="Refresh interval in seconds (default: 1)",
+)
+def live(symbols: tuple[str, ...], refresh: int) -> None:
+    """Watch live prices for one or more symbols.
+    
+    SYMBOLS are the trading symbols to watch (e.g., RELIANCE INFY TCS).
+    
+    Press Ctrl+C to stop watching.
+    
+    \b
+    Examples:
+      daytrader live RELIANCE
+      daytrader live YESBANK IDEA SBIN
+      daytrader live RELIANCE --refresh 2
+    """
+    import time
+    from rich.live import Live
+    
+    config = _get_config()
+    
+    if config is None:
+        console.print(Panel(
+            "[red]Configuration not found.[/red]\n\n"
+            "Run [cyan]daytrader login[/cyan] to create a config file.",
+            title="[bold red]Error[/bold red]",
+            border_style="red",
+        ))
+        raise SystemExit(1)
+    
+    symbols = tuple(s.upper() for s in symbols)
+    
+    try:
+        broker = _get_broker(config)
+        
+        def generate_table() -> Table:
+            """Generate the live price table."""
+            table = Table(
+                title="Live Prices (Ctrl+C to stop)",
+                show_header=True,
+                header_style="bold cyan",
+            )
+            
+            table.add_column("Symbol", style="bold")
+            table.add_column("LTP", justify="right")
+            table.add_column("Change", justify="right")
+            table.add_column("Change %", justify="right")
+            table.add_column("Open", justify="right", style="dim")
+            table.add_column("High", justify="right", style="green")
+            table.add_column("Low", justify="right", style="red")
+            
+            for symbol in symbols:
+                try:
+                    q = broker.get_quote(symbol)
+                    
+                    if q.change >= 0:
+                        change_color = "green"
+                        arrow = "▲"
+                    else:
+                        change_color = "red"
+                        arrow = "▼"
+                    
+                    table.add_row(
+                        symbol,
+                        f"₹{q.ltp:.2f}",
+                        f"[{change_color}]{arrow} {q.change:+.2f}[/{change_color}]",
+                        f"[{change_color}]{q.change_percent:+.2f}%[/{change_color}]",
+                        f"₹{q.open:.2f}",
+                        f"₹{q.high:.2f}",
+                        f"₹{q.low:.2f}",
+                    )
+                except Exception as e:
+                    table.add_row(
+                        symbol,
+                        "[red]Error[/red]",
+                        "-",
+                        "-",
+                        "-",
+                        "-",
+                        "-",
+                    )
+            
+            return table
+        
+        console.print(f"[dim]Watching {len(symbols)} symbol(s), refreshing every {refresh}s...[/dim]\n")
+        
+        with Live(generate_table(), refresh_per_second=1, console=console) as live_display:
+            while True:
+                time.sleep(refresh)
+                live_display.update(generate_table())
+                
+    except KeyboardInterrupt:
+        console.print("\n[dim]Stopped watching.[/dim]")
+    except Exception as e:
+        console.print(Panel(
+            f"[red]Failed to watch prices:[/red]\n\n{str(e)}",
+            title="[bold red]Error[/bold red]",
+            border_style="red",
+        ))
+        raise SystemExit(1)
+
+
+@click.command()
 @click.argument("symbol")
 def quote(symbol: str) -> None:
     """Display current quote for a symbol.

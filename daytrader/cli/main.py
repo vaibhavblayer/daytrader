@@ -81,6 +81,7 @@ LAZY_SUBCOMMANDS = {
     "logout": "daytrader.cli.auth",
     "data": "daytrader.cli.data",
     "quote": "daytrader.cli.data",
+    "live": "daytrader.cli.data",
     "analyze": "daytrader.cli.analyze",
     "scan": "daytrader.cli.scan",
     "buy": "daytrader.cli.trade",

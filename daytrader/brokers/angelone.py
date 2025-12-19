@@ -217,6 +217,11 @@ class AngelOneBroker(BaseBroker):
             self._smart_api.setAccessToken(token)
             if self._refresh_token:
                 self._smart_api.setRefreshToken(self._refresh_token)
+                # Generate new token from refresh token (as per official docs)
+                try:
+                    self._smart_api.generateToken(self._refresh_token)
+                except Exception:
+                    pass  # Ignore if token refresh fails
 
     def _get_symbol_info(self, symbol: str, exchange: str = "NSE") -> tuple[str, str]:
         """Get the token and proper trading symbol for a symbol.
@@ -279,12 +284,18 @@ class AngelOneBroker(BaseBroker):
                 for item in search_result["data"]:
                     trading_symbol = item.get("tradingsymbol", "")
                     if trading_symbol.upper() == f"{symbol_upper}-EQ":
-                        return (item.get("symboltoken", symbol), trading_symbol)
+                        return (item.get("symboltoken", ""), trading_symbol)
+                
+                # Try any result ending with -EQ (equity segment)
+                for item in search_result["data"]:
+                    trading_symbol = item.get("tradingsymbol", "")
+                    if trading_symbol.upper().endswith("-EQ"):
+                        return (item.get("symboltoken", ""), trading_symbol)
                 
                 # Finally, take the first result if available
                 if search_result["data"]:
                     first = search_result["data"][0]
-                    return (first.get("symboltoken", symbol), first.get("tradingsymbol", symbol))
+                    return (first.get("symboltoken", ""), first.get("tradingsymbol", symbol))
         except Exception:
             pass
         
@@ -418,6 +429,16 @@ class AngelOneBroker(BaseBroker):
             # Get proper symbol token and trading symbol
             symbol_token, trading_symbol = self._get_symbol_info(order.symbol)
             
+            # Map product types to SmartAPI values
+            product_map = {
+                "MIS": "INTRADAY",
+                "CNC": "DELIVERY",
+                "NRML": "CARRYFORWARD",
+                "INTRADAY": "INTRADAY",
+                "DELIVERY": "DELIVERY",
+            }
+            product_type = product_map.get(order.product.upper(), "INTRADAY")
+            
             order_params = {
                 "variety": variety,
                 "tradingsymbol": trading_symbol,
@@ -425,17 +446,66 @@ class AngelOneBroker(BaseBroker):
                 "transactiontype": order.side,
                 "exchange": "NSE",
                 "ordertype": order.order_type,
-                "producttype": order.product,
+                "producttype": product_type,
                 "duration": "DAY",
                 "quantity": str(order.quantity),
                 "price": str(order.price) if order.price else "0",
                 "triggerprice": str(order.trigger_price) if order.trigger_price else "0",
             }
             
-            response = self._smart_api.placeOrder(order_params)
+            # Log order params for debugging
+            import logging
+            logging.info(f"Placing order with params: {order_params}")
             
-            if response and response.get("status"):
-                order_id = response.get("data", {}).get("orderid", "")
+            try:
+                response = self._smart_api.placeOrder(order_params)
+            except Exception as api_error:
+                error_msg = str(api_error)
+                # Check if it's a JSON parsing error with empty response
+                if "Couldn't parse" in error_msg and "b''" in error_msg:
+                    return OrderResult(
+                        order_id="",
+                        status="ERROR",
+                        filled_qty=0,
+                        filled_price=0.0,
+                        message="Broker API returned empty response. Try re-login with 'daytrader login'",
+                    )
+                # Return the actual error message from broker
+                return OrderResult(
+                    order_id="",
+                    status="ERROR",
+                    filled_qty=0,
+                    filled_price=0.0,
+                    message=error_msg,
+                )
+            
+            logging.info(f"Order response: {response}")
+            
+            if response is None:
+                return OrderResult(
+                    order_id="",
+                    status="ERROR",
+                    filled_qty=0,
+                    filled_price=0.0,
+                    message="Empty response from broker API",
+                )
+            
+            # Handle string response (order ID directly returned)
+            if isinstance(response, str):
+                return OrderResult(
+                    order_id=response,
+                    status="PLACED",
+                    filled_qty=0,
+                    filled_price=0.0,
+                    message="Order placed successfully",
+                )
+            
+            if response.get("status"):
+                order_id = (
+                    response.get("data", {}).get("orderid", "")
+                    if response.get("data")
+                    else ""
+                )
                 return OrderResult(
                     order_id=order_id,
                     status="PLACED",

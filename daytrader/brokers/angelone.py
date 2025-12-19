@@ -423,7 +423,7 @@ class AngelOneBroker(BaseBroker):
         self._ensure_authenticated()
         
         try:
-            # Use variety from order (NORMAL or AMO)
+            # Use variety from order (NORMAL, AMO, or STOPLOSS)
             variety = getattr(order, 'variety', 'NORMAL') or 'NORMAL'
             
             # Get proper symbol token and trading symbol
@@ -439,13 +439,24 @@ class AngelOneBroker(BaseBroker):
             }
             product_type = product_map.get(order.product.upper(), "INTRADAY")
             
+            # Map order types to SmartAPI values
+            order_type_map = {
+                "MARKET": "MARKET",
+                "LIMIT": "LIMIT",
+                "SL-M": "STOPLOSS_MARKET",
+                "SL": "STOPLOSS_LIMIT",
+                "STOPLOSS_MARKET": "STOPLOSS_MARKET",
+                "STOPLOSS_LIMIT": "STOPLOSS_LIMIT",
+            }
+            order_type = order_type_map.get(order.order_type.upper(), order.order_type)
+            
             order_params = {
                 "variety": variety,
                 "tradingsymbol": trading_symbol,
                 "symboltoken": symbol_token,
                 "transactiontype": order.side,
                 "exchange": "NSE",
-                "ordertype": order.order_type,
+                "ordertype": order_type,
                 "producttype": product_type,
                 "duration": "DAY",
                 "quantity": str(order.quantity),

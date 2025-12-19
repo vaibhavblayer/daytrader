@@ -239,8 +239,8 @@ def buy(
                 is_paper=config.get("trading", {}).get("mode", "paper") == "paper",
             )
             
-            # Place SL order if specified
-            if sl and result.status == "COMPLETE":
+            # Place SL order if specified (for COMPLETE or PLACED status)
+            if sl and result.status in ("COMPLETE", "PLACED"):
                 _place_sl_order(config, symbol, qty, sl, product)
         else:
             # Failed
@@ -274,12 +274,14 @@ def _place_sl_order(config: dict, symbol: str, qty: int, sl_price: float, produc
     """
     from daytrader.models import Order
     
+    # Use STOPLOSS variety for SL-M orders (Angel One requirement)
     sl_order = Order(
         symbol=symbol,
         side="SELL",
         quantity=qty,
-        order_type="SL-M",
+        order_type="STOPLOSS_MARKET",
         product=product,
+        variety="STOPLOSS",
         price=None,
         trigger_price=sl_price,
     )
@@ -290,8 +292,9 @@ def _place_sl_order(config: dict, symbol: str, qty: int, sl_price: float, produc
         broker = _get_broker(config)
         result = broker.place_order(sl_order)
         
-        if result.status == "COMPLETE" or result.status == "OPEN" or result.status == "TRIGGER_PENDING":
+        if result.status in ("COMPLETE", "OPEN", "TRIGGER_PENDING", "PLACED"):
             console.print(f"[green]✓ Stop-loss order placed: {result.order_id}[/green]")
+            console.print(f"[dim]  SL will trigger if price falls to ₹{sl_price:.2f}[/dim]")
         else:
             console.print(f"[yellow]⚠ Stop-loss order failed: {result.message}[/yellow]")
     except Exception as e:

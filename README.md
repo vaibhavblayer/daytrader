@@ -46,6 +46,7 @@ totp_secret = "your-totp-secret"
 
 [openai]
 api_key = "your-openai-key"  # Optional, for AI features
+model = "o4-mini"            # Default: o4-mini (medium reasoning), or gpt-4o, etc.
 
 [tavily]
 api_key = "your-tavily-key"  # Optional, for news/research
@@ -105,6 +106,10 @@ daytrader signal YESBANK
 
 # Multi-timeframe analysis (5min, 15min, 1hour, 1day)
 daytrader mtf RELIANCE
+
+# AI-powered analysis (requires OpenAI API key)
+daytrader analyze RELIANCE --ai
+daytrader analyze YESBANK -t 15min --ai
 ```
 
 ### Trading

@@ -108,6 +108,38 @@ def _get_data_store():
     return DataStore(db_path)
 
 
+def _get_ai_analysis(symbol: str, timeframe: str, results: dict, config: dict) -> str:
+    """Get AI verification and trading advice using the Technical Verification Agent.
+    
+    Args:
+        symbol: Trading symbol.
+        timeframe: Candle timeframe.
+        results: Indicator results dictionary.
+        config: Application config with OpenAI settings.
+        
+    Returns:
+        AI analysis text.
+    """
+    try:
+        from daytrader.agents.technical import get_ai_verification
+    except ImportError as e:
+        return f"[yellow]Agent SDK not available: {e}[/yellow]"
+    
+    # Get model from config (default: o4-mini for medium reasoning)
+    openai_config = config.get("openai", {})
+    model = openai_config.get("model", "o4-mini")
+    
+    try:
+        return get_ai_verification(
+            symbol=symbol,
+            timeframe=timeframe,
+            results=results,
+            model=model,
+        )
+    except Exception as e:
+        return f"[red]AI Error: {str(e)}[/red]"
+
+
 def _parse_indicators(indicators_str: str) -> list[str]:
     """Parse comma-separated indicator string into list.
     
@@ -195,6 +227,7 @@ def calculate_indicators_for_symbol(
     indicators: list[str],
     store,
     days: int = 100,
+    timeframe: str = "1day",
 ) -> dict:
     """Calculate requested indicators for a symbol.
     
@@ -203,6 +236,7 @@ def calculate_indicators_for_symbol(
         indicators: List of indicator names to calculate.
         store: DataStore instance.
         days: Number of days of data to use.
+        timeframe: Candle interval (1min, 5min, 15min, 1hour, 1day).
         
     Returns:
         Dictionary with indicator results.
@@ -211,7 +245,7 @@ def calculate_indicators_for_symbol(
     to_date = date.today()
     from_date = to_date - timedelta(days=days)
     
-    candles = store.get_candles(symbol, "1day", from_date, to_date)
+    candles = store.get_candles(symbol, timeframe, from_date, to_date)
     
     if not candles or len(candles) < 30:
         return {"error": f"Insufficient data for {symbol}. Need at least 30 candles."}
@@ -381,11 +415,37 @@ def calculate_indicators_for_symbol(
         recent_low = min(lows[-20:])
         trend = "up" if closes[-1] > closes[-20] else "down"
         fib_levels = calculate_fibonacci_levels(recent_high, recent_low, trend)
+        
+        # Find nearest support and resistance levels
+        price = closes[-1]
+        sorted_levels = sorted(fib_levels.items(), key=lambda x: x[1])
+        nearest_support = None
+        nearest_resistance = None
+        current_zone = None
+        
+        for i, (level, level_price) in enumerate(sorted_levels):
+            if level_price < price:
+                nearest_support = (level, level_price)
+            elif level_price >= price and nearest_resistance is None:
+                nearest_resistance = (level, level_price)
+        
+        # Determine which zone price is in
+        for i in range(len(sorted_levels) - 1):
+            low_level, low_price = sorted_levels[i]
+            high_level, high_price = sorted_levels[i + 1]
+            if low_price <= price <= high_price:
+                current_zone = f"{low_level} - {high_level}"
+                break
+        
         results["indicators"]["fib"] = {
             "levels": fib_levels,
             "trend": trend,
             "swing_high": recent_high,
             "swing_low": recent_low,
+            "nearest_support": nearest_support,
+            "nearest_resistance": nearest_resistance,
+            "current_zone": current_zone,
+            "price": price,
         }
     
     if "pivot" in indicators:
@@ -474,7 +534,20 @@ def calculate_indicators_for_symbol(
     default=None,
     help=f"Comma-separated indicators. Available: {', '.join(AVAILABLE_INDICATORS)}",
 )
-def analyze(symbol: str, indicators: str) -> None:
+@click.option(
+    "--timeframe",
+    "-t",
+    default="1day",
+    type=click.Choice(["1min", "5min", "15min", "1hour", "1day"]),
+    help="Candle timeframe for analysis (default: 1day)",
+)
+@click.option(
+    "--ai",
+    is_flag=True,
+    default=False,
+    help="Get AI verification and trading advice from GPT",
+)
+def analyze(symbol: str, indicators: str, timeframe: str, ai: bool) -> None:
     """Calculate and display technical indicators for a symbol.
     
     SYMBOL is the trading symbol (e.g., RELIANCE, INFY, TCS).
@@ -499,11 +572,14 @@ def analyze(symbol: str, indicators: str) -> None:
       patterns   - Candlestick pattern detection
     
     \b
+    Timeframes: 1min, 5min, 15min, 1hour, 1day
+    
+    \b
     Examples:
-      daytrader analyze RELIANCE                       # Default indicators
-      daytrader analyze INFY --indicators rsi,macd     # Specific indicators
-      daytrader analyze TCS -i supertrend,adx,fib      # Trend indicators
-      daytrader analyze SBIN -i pivot,fib,patterns     # Support/Resistance
+      daytrader analyze RELIANCE                       # Default (daily)
+      daytrader analyze RELIANCE -t 5min              # 5-minute candles
+      daytrader analyze RELIANCE --ai                 # With AI verification
+      daytrader analyze INFY -i patterns -t 15min     # 15min patterns
     """
     config = _get_config()
     
@@ -519,25 +595,30 @@ def analyze(symbol: str, indicators: str) -> None:
     symbol = symbol.upper()
     indicator_list = _parse_indicators(indicators) if indicators else DEFAULT_INDICATORS
     
-    console.print(f"[dim]Analyzing {symbol} with indicators: {', '.join(indicator_list)}...[/dim]")
+    tf_display = {"1min": "1-minute", "5min": "5-minute", "15min": "15-minute", "1hour": "1-hour", "1day": "daily"}
+    console.print(f"[dim]Analyzing {symbol} ({tf_display[timeframe]}) with indicators: {', '.join(indicator_list)}...[/dim]")
     
     store = _get_data_store()
-    results = calculate_indicators_for_symbol(symbol, indicator_list, store)
+    
+    # For intraday timeframes, use fewer days but need data first
+    days = 100 if timeframe == "1day" else 5
+    results = calculate_indicators_for_symbol(symbol, indicator_list, store, days=days, timeframe=timeframe)
     
     if "error" in results:
         console.print(Panel(
             f"[yellow]{results['error']}[/yellow]\n\n"
             "[dim]Try fetching data first with:[/dim]\n"
-            f"[cyan]daytrader data {symbol} --days 100[/cyan]",
+            f"[cyan]daytrader data {symbol} --days 5 --interval {timeframe}[/cyan]",
             title="[bold yellow]Insufficient Data[/bold yellow]",
             border_style="yellow",
         ))
         return
     
     # Build output
+    tf_label = tf_display[timeframe]
     output_lines = [
         f"[bold]{symbol}[/bold] - ₹{results['last_price']:.2f}",
-        f"[dim]Based on {results['candle_count']} daily candles[/dim]\n",
+        f"[dim]Based on {results['candle_count']} {tf_label} candles[/dim]\n",
     ]
     
     # Display each indicator
@@ -637,10 +718,29 @@ def analyze(symbol: str, indicators: str) -> None:
     if "fib" in ind_results:
         fib = ind_results["fib"]
         output_lines.append(
-            f"[bold]Fibonacci ({fib['trend'].upper()} trend):[/bold]"
+            f"[bold]Fibonacci ({fib['trend'].upper()} trend):[/bold] "
+            f"Swing: ₹{fib['swing_low']:.2f} - ₹{fib['swing_high']:.2f}"
         )
-        for level, price in fib["levels"].items():
-            output_lines.append(f"  {level}: ₹{price:.2f}")
+        # Show key levels with current price position
+        price = fib.get("price", results["last_price"])
+        for level, level_price in fib["levels"].items():
+            # Highlight nearest support/resistance
+            marker = ""
+            if fib.get("nearest_support") and fib["nearest_support"][0] == level:
+                marker = " [green]◄ SUPPORT[/green]"
+            elif fib.get("nearest_resistance") and fib["nearest_resistance"][0] == level:
+                marker = " [red]◄ RESISTANCE[/red]"
+            output_lines.append(f"  {level}: ₹{level_price:.2f}{marker}")
+        
+        # Show actionable info
+        if fib.get("current_zone"):
+            output_lines.append(f"  [cyan]Price Zone: {fib['current_zone']}[/cyan]")
+        if fib.get("nearest_support"):
+            support_dist = ((price - fib["nearest_support"][1]) / price) * 100
+            output_lines.append(f"  [dim]Support {support_dist:.1f}% below[/dim]")
+        if fib.get("nearest_resistance"):
+            resist_dist = ((fib["nearest_resistance"][1] - price) / price) * 100
+            output_lines.append(f"  [dim]Resistance {resist_dist:.1f}% above[/dim]")
     
     if "pivot" in ind_results:
         pivot = ind_results["pivot"]
@@ -695,11 +795,99 @@ def analyze(symbol: str, indicators: str) -> None:
         else:
             output_lines.append(f"[bold]Candlestick Patterns:[/bold] [dim]None detected[/dim]")
     
+    # Add trading summary
+    output_lines.append("")
+    output_lines.append("[bold]─── Trading Summary ───[/bold]")
+    
+    bullish_signals = 0
+    bearish_signals = 0
+    sl_price = None
+    target_price = None
+    
+    # Count signals and extract key levels
+    if "supertrend" in ind_results:
+        st = ind_results["supertrend"]
+        if st["direction"] == 1:
+            bullish_signals += 1
+            sl_price = st["value"]  # SuperTrend as SL
+        else:
+            bearish_signals += 1
+    
+    if "rsi" in ind_results:
+        rsi = ind_results["rsi"]
+        if rsi["value"] < 40:
+            bullish_signals += 1
+        elif rsi["value"] > 60:
+            bearish_signals += 1
+    
+    if "adx" in ind_results:
+        adx = ind_results["adx"]
+        if adx["direction"] == "Bullish" and adx["adx"] > 20:
+            bullish_signals += 1
+        elif adx["direction"] == "Bearish" and adx["adx"] > 20:
+            bearish_signals += 1
+    
+    if "bb" in ind_results:
+        bb = ind_results["bb"]
+        if "Lower" in bb["signal"]:
+            bullish_signals += 1
+        elif "Upper" in bb["signal"]:
+            bearish_signals += 1
+    
+    # Get target from Fibonacci resistance
+    if "fib" in ind_results:
+        fib = ind_results["fib"]
+        if fib.get("nearest_resistance"):
+            target_price = fib["nearest_resistance"][1]
+        if fib.get("nearest_support") and not sl_price:
+            sl_price = fib["nearest_support"][1]
+    
+    # Determine overall bias
+    total_signals = bullish_signals + bearish_signals
+    if total_signals > 0:
+        if bullish_signals > bearish_signals:
+            bias = "BULLISH"
+            bias_color = "green"
+            bias_pct = (bullish_signals / total_signals) * 100
+        elif bearish_signals > bullish_signals:
+            bias = "BEARISH"
+            bias_color = "red"
+            bias_pct = (bearish_signals / total_signals) * 100
+        else:
+            bias = "NEUTRAL"
+            bias_color = "yellow"
+            bias_pct = 50
+        
+        output_lines.append(f"Bias: [{bias_color}]{bias}[/{bias_color}] ({bias_pct:.0f}% of signals)")
+    
+    # Show suggested levels
+    price = results["last_price"]
+    if sl_price:
+        sl_risk = ((price - sl_price) / price) * 100
+        output_lines.append(f"Stop Loss: ₹{sl_price:.2f} [dim]({sl_risk:.1f}% risk)[/dim]")
+    if target_price and target_price > price:
+        target_reward = ((target_price - price) / price) * 100
+        output_lines.append(f"Target: ₹{target_price:.2f} [dim]({target_reward:.1f}% reward)[/dim]")
+        if sl_price and sl_price < price:
+            rr_ratio = target_reward / sl_risk if sl_risk > 0 else 0
+            rr_color = "green" if rr_ratio >= 2 else "yellow" if rr_ratio >= 1 else "red"
+            output_lines.append(f"Risk:Reward: [{rr_color}]1:{rr_ratio:.1f}[/{rr_color}]")
+    
     console.print(Panel(
         "\n".join(output_lines),
         title="[bold cyan]Technical Analysis[/bold cyan]",
         border_style="cyan",
     ))
+    
+    # AI verification if requested
+    if ai:
+        console.print("\n[dim]Getting AI analysis...[/dim]")
+        ai_response = _get_ai_analysis(symbol, timeframe, results, config)
+        console.print(Panel(
+            ai_response,
+            title="[bold magenta]🤖 AI Analysis[/bold magenta]",
+            border_style="magenta",
+        ))
 
 
 @click.command()

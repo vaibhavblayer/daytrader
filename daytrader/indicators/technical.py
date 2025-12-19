@@ -726,6 +726,51 @@ def detect_candlestick_patterns(
         # Bearish Engulfing
         elif prev_c > prev_o and c < o and o > prev_c and c < prev_o and body > prev_body:
             patterns.append({"index": i, "pattern": "Bearish Engulfing", "signal": "bearish"})
+        
+        # Morning Star (3-candle pattern)
+        if i >= 2:
+            c2_o, c2_c = open_prices[i - 2], close[i - 2]
+            c1_o, c1_c, c1_body = prev_o, prev_c, prev_body
+            c1_range = high[i - 1] - low[i - 1]
+            
+            # First candle bearish, second small body (star), third bullish
+            if (c2_c < c2_o and  # First bearish
+                c1_body < c1_range * 0.3 and  # Second small body (star)
+                c > o and  # Third bullish
+                c > (c2_o + c2_c) / 2):  # Third closes above midpoint of first
+                patterns.append({"index": i, "pattern": "Morning Star", "signal": "bullish"})
+            
+            # Evening Star (opposite of Morning Star)
+            elif (c2_c > c2_o and  # First bullish
+                  c1_body < c1_range * 0.3 and  # Second small body (star)
+                  c < o and  # Third bearish
+                  c < (c2_o + c2_c) / 2):  # Third closes below midpoint of first
+                patterns.append({"index": i, "pattern": "Evening Star", "signal": "bearish"})
+        
+        # Three White Soldiers (3 consecutive bullish candles)
+        if i >= 2:
+            c2_o, c2_c = open_prices[i - 2], close[i - 2]
+            c1_o, c1_c = prev_o, prev_c
+            if (c2_c > c2_o and c1_c > c1_o and c > o and  # All bullish
+                c1_c > c2_c and c > c1_c and  # Each closes higher
+                c1_o > c2_o and o > c1_o):  # Each opens higher
+                patterns.append({"index": i, "pattern": "Three White Soldiers", "signal": "bullish"})
+        
+        # Three Black Crows (3 consecutive bearish candles)
+        if i >= 2:
+            c2_o, c2_c = open_prices[i - 2], close[i - 2]
+            c1_o, c1_c = prev_o, prev_c
+            if (c2_c < c2_o and c1_c < c1_o and c < o and  # All bearish
+                c1_c < c2_c and c < c1_c and  # Each closes lower
+                c1_o < c2_o and o < c1_o):  # Each opens lower
+                patterns.append({"index": i, "pattern": "Three Black Crows", "signal": "bearish"})
+        
+        # Marubozu (strong candle with no/tiny shadows)
+        if upper_shadow < body * 0.1 and lower_shadow < body * 0.1:
+            if c > o:
+                patterns.append({"index": i, "pattern": "Bullish Marubozu", "signal": "bullish"})
+            else:
+                patterns.append({"index": i, "pattern": "Bearish Marubozu", "signal": "bearish"})
     
     return patterns
 

@@ -20,6 +20,7 @@ from daytrader.agents.analyst import DataAnalystAgent
 from daytrader.agents.news import NewsAgent, analyze_sentiment, classify_sentiment
 from daytrader.agents.trader import TradingAgent
 from daytrader.agents.orchestrator import OrchestratorAgent, classify_query
+from daytrader.agents.technical import TechnicalVerificationAgent, get_ai_verification
 
 __all__ = [
     # Base utilities
@@ -34,8 +35,10 @@ __all__ = [
     "NewsAgent",
     "TradingAgent",
     "OrchestratorAgent",
+    "TechnicalVerificationAgent",
     # Utility functions
     "analyze_sentiment",
     "classify_sentiment",
     "classify_query",
+    "get_ai_verification",
 ]

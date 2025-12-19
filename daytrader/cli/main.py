@@ -83,6 +83,8 @@ LAZY_SUBCOMMANDS = {
     "quote": "daytrader.cli.data",
     "live": "daytrader.cli.data",
     "analyze": "daytrader.cli.analyze",
+    "signal": "daytrader.cli.analyze",
+    "mtf": "daytrader.cli.analyze",
     "scan": "daytrader.cli.scan",
     "buy": "daytrader.cli.trade",
     "sell": "daytrader.cli.trade",
@@ -91,6 +93,8 @@ LAZY_SUBCOMMANDS = {
     "pnl": "daytrader.cli.portfolio",
     "balance": "daytrader.cli.portfolio",
     "journal": "daytrader.cli.portfolio",
+    "sync": "daytrader.cli.portfolio",
+    "report": "daytrader.cli.portfolio",
     # AI Features
     "ask": "daytrader.cli.ask",
     "research": "daytrader.cli.ask",

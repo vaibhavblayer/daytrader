@@ -569,11 +569,20 @@ class AngelOneBroker(BaseBroker):
                 qty = int(pos.get("netqty", 0))
                 if qty == 0:
                     continue
-                    
-                avg_price = float(pos.get("averageprice", 0))
-                ltp = float(pos.get("ltp", avg_price))
-                pnl = (ltp - avg_price) * qty
-                pnl_percent = (pnl / (avg_price * abs(qty)) * 100) if avg_price > 0 else 0
+                
+                # Use the correct field names from Angel One API
+                # For buy positions: buyavgprice or totalbuyavgprice
+                # For sell positions: sellavgprice
+                # avgnetprice is the net average price
+                avg_price = float(pos.get("avgnetprice", 0) or pos.get("buyavgprice", 0) or 0)
+                ltp = float(pos.get("ltp", 0))
+                
+                # Use the pre-calculated P&L from API (unrealised for open positions)
+                pnl = float(pos.get("unrealised", 0) or pos.get("pnl", 0) or 0)
+                
+                # Calculate P&L percentage
+                cost = avg_price * abs(qty)
+                pnl_percent = (pnl / cost * 100) if cost > 0 else 0
                 
                 positions.append(Position(
                     symbol=pos.get("tradingsymbol", ""),
@@ -582,7 +591,7 @@ class AngelOneBroker(BaseBroker):
                     ltp=ltp,
                     pnl=pnl,
                     pnl_percent=pnl_percent,
-                    product=pos.get("producttype", "MIS"),
+                    product=pos.get("producttype", "INTRADAY"),
                 ))
             
             return positions

@@ -39,6 +39,45 @@ def _get_data_store():
     return DataStore(db_path)
 
 
+def _log_trade(
+    symbol: str,
+    side: str,
+    quantity: int,
+    price: float,
+    order_id: str,
+    is_paper: bool = False,
+    pnl: float = None,
+) -> None:
+    """Log a trade to the journal.
+    
+    Args:
+        symbol: Trading symbol.
+        side: BUY or SELL.
+        quantity: Number of shares.
+        price: Execution price.
+        order_id: Broker order ID.
+        is_paper: Whether this is a paper trade.
+        pnl: P&L for sell trades.
+    """
+    from datetime import datetime
+    from daytrader.models import Trade
+    
+    store = _get_data_store()
+    
+    trade = Trade(
+        symbol=symbol,
+        side=side,
+        quantity=quantity,
+        price=price,
+        timestamp=datetime.now(),
+        order_id=order_id,
+        is_paper=is_paper,
+        pnl=pnl,
+    )
+    
+    store.log_trade(trade)
+
+
 def _get_broker(config: dict):
     """Get the appropriate broker based on config."""
     trading_mode = config.get("trading", {}).get("mode", "paper")
@@ -189,6 +228,16 @@ def buy(
                 result_text += f"\n\n[dim]{result.message}[/dim]"
             
             console.print(Panel(result_text, title="[bold green]Success[/bold green]", border_style="green"))
+            
+            # Log trade to journal
+            _log_trade(
+                symbol=symbol,
+                side="BUY",
+                quantity=qty,
+                price=result.filled_price if result.filled_price > 0 else (price or 0),
+                order_id=result.order_id,
+                is_paper=config.get("trading", {}).get("mode", "paper") == "paper",
+            )
             
             # Place SL order if specified
             if sl and result.status == "COMPLETE":
@@ -358,6 +407,16 @@ def sell(
                 result_text += f"\n\n[dim]{result.message}[/dim]"
             
             console.print(Panel(result_text, title="[bold green]Success[/bold green]", border_style="green"))
+            
+            # Log trade to journal
+            _log_trade(
+                symbol=symbol,
+                side="SELL",
+                quantity=qty,
+                price=result.filled_price if result.filled_price > 0 else (price or 0),
+                order_id=result.order_id,
+                is_paper=config.get("trading", {}).get("mode", "paper") == "paper",
+            )
         else:
             # Failed
             console.print(Panel(

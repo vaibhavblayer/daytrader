@@ -605,10 +605,43 @@ def analyze(symbol: str, indicators: str, timeframe: str, ai: bool) -> None:
     results = calculate_indicators_for_symbol(symbol, indicator_list, store, days=days, timeframe=timeframe)
     
     if "error" in results:
+        # Try to auto-fetch data
+        console.print(f"[dim]No cached data, fetching {timeframe} data for {symbol}...[/dim]")
+        try:
+            from daytrader.brokers.angelone import AngelOneBroker
+            
+            angelone_config = config.get("angelone", {})
+            if angelone_config.get("api_key"):
+                broker = AngelOneBroker(
+                    api_key=angelone_config.get("api_key", ""),
+                    client_id=angelone_config.get("client_id", ""),
+                    pin=angelone_config.get("pin", ""),
+                    totp_secret=angelone_config.get("totp_secret", ""),
+                )
+                
+                to_date = date.today()
+                from_date = to_date - timedelta(days=days)
+                
+                candles = broker.get_historical(
+                    symbol=symbol,
+                    from_date=from_date,
+                    to_date=to_date,
+                    interval=timeframe,
+                )
+                
+                if candles:
+                    store.save_candles(symbol, timeframe, candles)
+                    console.print(f"[dim]Fetched {len(candles)} candles[/dim]")
+                    # Retry analysis
+                    results = calculate_indicators_for_symbol(symbol, indicator_list, store, days=days, timeframe=timeframe)
+        except Exception as e:
+            console.print(f"[dim]Auto-fetch failed: {e}[/dim]")
+    
+    if "error" in results:
         console.print(Panel(
             f"[yellow]{results['error']}[/yellow]\n\n"
             "[dim]Try fetching data first with:[/dim]\n"
-            f"[cyan]daytrader data {symbol} --days 5 --interval {timeframe}[/cyan]",
+            f"[cyan]daytrader data {symbol} --days 5 -t {timeframe}[/cyan]",
             title="[bold yellow]Insufficient Data[/bold yellow]",
             border_style="yellow",
         ))

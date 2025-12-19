@@ -138,10 +138,21 @@ def data(symbol: str, days: int, timeframe: str) -> None:
         to_date=to_date,
     )
     
-    if cached_candles:
+    # Calculate expected candles (rough estimate)
+    if timeframe == "1day":
+        expected_candles = int(days * 0.7)  # ~70% trading days
+    elif timeframe == "1hour":
+        expected_candles = int(days * 6)  # ~6 hours per day
+    else:
+        expected_candles = int(days * 75)  # ~75 candles per day for minute intervals
+    
+    # Use cache only if it has reasonable amount of data
+    if cached_candles and len(cached_candles) >= expected_candles * 0.8:
         console.print(f"[dim]Found {len(cached_candles)} candles in cache[/dim]")
         candles = cached_candles
     else:
+        if cached_candles:
+            console.print(f"[dim]Cache has only {len(cached_candles)} candles, fetching fresh data...[/dim]")
         # Fetch from broker - use Angel One for data even in paper mode
         try:
             # Try data broker first (Angel One for real data)

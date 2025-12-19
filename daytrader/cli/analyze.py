@@ -80,7 +80,7 @@ AVAILABLE_INDICATORS = [
     "rsi", "macd", "ema", "sma", "bb", "atr", "vwap",
     "stoch", "adx", "supertrend", "fib", "pivot", "obv", "cci", "willr", "patterns"
 ]
-DEFAULT_INDICATORS = ["rsi", "macd", "bb", "supertrend"]
+DEFAULT_INDICATORS = ["bb", "supertrend", "fib", "rsi", "adx"]
 
 
 def _get_config():
@@ -471,8 +471,8 @@ def calculate_indicators_for_symbol(
 @click.option(
     "--indicators",
     "-i",
-    default=",".join(DEFAULT_INDICATORS),
-    help=f"Comma-separated indicators to calculate. Available: {', '.join(AVAILABLE_INDICATORS)} (default: {', '.join(DEFAULT_INDICATORS)})",
+    default=None,
+    help=f"Comma-separated indicators. Available: {', '.join(AVAILABLE_INDICATORS)}",
 )
 def analyze(symbol: str, indicators: str) -> None:
     """Calculate and display technical indicators for a symbol.
@@ -517,7 +517,7 @@ def analyze(symbol: str, indicators: str) -> None:
         raise SystemExit(1)
     
     symbol = symbol.upper()
-    indicator_list = _parse_indicators(indicators)
+    indicator_list = _parse_indicators(indicators) if indicators else DEFAULT_INDICATORS
     
     console.print(f"[dim]Analyzing {symbol} with indicators: {', '.join(indicator_list)}...[/dim]")
     

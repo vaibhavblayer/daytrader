@@ -87,26 +87,23 @@ daytrader live YESBANK IDEA RELIANCE --refresh 2
 ### Technical Analysis
 
 ```bash
-# Basic analysis with Bollinger Bands
+# Default analysis (Bollinger Bands, SuperTrend, Fibonacci, RSI, ADX)
 daytrader analyze RELIANCE
 
-# With specific indicators
-daytrader analyze RELIANCE --indicator rsi
-daytrader analyze RELIANCE --indicator macd
-daytrader analyze RELIANCE --indicator stochastic
-daytrader analyze RELIANCE --indicator adx
-daytrader analyze RELIANCE --indicator supertrend
-daytrader analyze RELIANCE --indicator fibonacci
-daytrader analyze RELIANCE --indicator pivot
-daytrader analyze RELIANCE --indicator obv
-daytrader analyze RELIANCE --indicator cci
-daytrader analyze RELIANCE --indicator williams
-daytrader analyze RELIANCE --indicator patterns  # Candlestick patterns
+# With specific indicators (comma-separated)
+daytrader analyze RELIANCE --indicators rsi,macd
+daytrader analyze RELIANCE -i supertrend,adx,fib
+daytrader analyze RELIANCE -i pivot,fib,patterns
+
+# Available indicators:
+#   rsi, macd, ema, sma, bb (Bollinger), atr, vwap,
+#   stoch (Stochastic), adx, supertrend, fib (Fibonacci),
+#   pivot, obv, cci, willr (Williams %R), patterns
 
 # Signal score (-100 to +100, combines multiple indicators)
 daytrader signal YESBANK
 
-# Multi-timeframe analysis
+# Multi-timeframe analysis (5min, 15min, 1hour, 1day)
 daytrader mtf RELIANCE
 ```
 
